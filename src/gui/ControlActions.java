@@ -47,6 +47,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.StrokeLineCap;
 import solver.MPSWriter;
 import solver.Solver;
+import solver.ImproveHeuristic;
 
 import static utilities.Utilities.*;
 
@@ -57,7 +58,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
 import javafx.stage.Stage;
-import solver.FlowHeuristic;
 import solver.GreedyHeuristic;
 
 /**
@@ -352,13 +352,42 @@ public class ControlActions {
     }
 
     private void runFlowHeuristic(String crf, String numYears, String capacityTarget, int modelVersion) {
-        //generateMPSFile(crf, numYears, capacityTarget, modelVersion, "f");
-        //runCPLEX();
-        FlowHeuristic.run(data, Double.parseDouble(crf), Integer.parseInt(numYears), Double.parseDouble(capacityTarget), basePath, dataset, scenario);
+        generateMPSFile(crf, numYears, capacityTarget, modelVersion, "f");
+        runCPLEX();
+    }
+    
+    
+    private void runImproveHeuristic(String file,int iterations) {
+        
+        Solution soln = null;
+        if (file != null && !file.equals("None")) {
+            String solutionPath = basePath + "/" + dataset + "/Scenarios/" + scenario + "/Results/" + file;
+
+            if (file.contains("greedy")) {
+                soln = DataInOut.loadGreedyHeuristicSolution(solutionPath);
+            } else if (file.contains("flow")) {
+                soln = DataInOut.loadSolution(solutionPath, -1);
+            }
+            
+                    
+            ImproveHeuristic improve = new ImproveHeuristic(data,soln);
+            
+            improve.improve(iterations);
+       
+            File solutionFile = new File(basePath + "/" + dataset + "/Scenarios/" + scenario + "/Results/improve_" + file);
+            solutionFile.mkdir();
+            
+            DataInOut.saveHeuristicSolution(solutionFile, improve);
+
+        }
+
+        
+        
     }
 
     public void runCPLEX() {
         // Check if CPLEX exists.
+        
         try {
             Runtime r = Runtime.getRuntime();
             r.exec("cplex");
@@ -396,9 +425,12 @@ public class ControlActions {
             run += dateFormat.format(date);
             File solutionDirectory = new File(basePath + "/" + dataset + "/Scenarios/" + scenario + "/Results/" + run);
 
+            
             String os = System.getProperty("os.name");
+            
             try {
                 solutionDirectory.mkdir();
+                
 
                 // Copy MPS file into results file.
                 String mpsFileName = "";
@@ -419,7 +451,7 @@ public class ControlActions {
                 Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING);
 
                 // Make OS script file and cplex commands file.
-                if (os.toLowerCase().contains("mac")) {
+                if (os.toLowerCase().contains("mac") || os.toLowerCase().contains("linux")) {
                     PrintWriter cplexCommands = new PrintWriter(solutionDirectory + "/cplexCommands.txt");
                     cplexCommands.println("set logfile *");
                     cplexCommands.println("read " + solutionDirectory.getAbsolutePath() + "/" + mpsFileName);
@@ -465,7 +497,13 @@ public class ControlActions {
             }
 
             try {
-                if (os.toLowerCase().contains("mac")) {
+                if(os.toLowerCase().contains("linux")) {
+
+                    String[] args = new String[]{"bash","-c",solutionDirectory.getAbsolutePath() + "/osCommands.sh"};
+                    ProcessBuilder pb = new ProcessBuilder(args);
+                    pb.directory(solutionDirectory);
+                    Process p = pb.start();
+                } else if (os.toLowerCase().contains("mac")) {
                     String[] args = new String[]{"/usr/bin/open", "-a", "Terminal", solutionDirectory.getAbsolutePath() + "/osCommands.sh"};
                     ProcessBuilder pb = new ProcessBuilder(args);
                     pb.directory(solutionDirectory);
@@ -478,6 +516,7 @@ public class ControlActions {
                 }
             } catch (IOException e) {
             }
+            
         } catch (IOException e) {
             messenger.setText("Error: Make sure CPLEX is installed and in System PATH.");
         }
@@ -600,7 +639,7 @@ public class ControlActions {
         if (file != null && !file.equals("None")) {
             String solutionPath = basePath + "/" + dataset + "/Scenarios/" + scenario + "/Results/" + file;
 
-            if (file.contains("greedy")) {
+            if (file.contains("greedy")||file.contains("improve")) {
                 Solution soln = DataInOut.loadGreedyHeuristicSolution(solutionPath);
                 displaySolution(file, soln, solutionValues);
             } else if (file.contains("flow")) {
