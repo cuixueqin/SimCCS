@@ -136,11 +136,25 @@ public class Solution {
             LinearComponent[] linearComponents = data.getLinearComponents();
             HashMap<Edge, Double> edgeConstructionCosts = data.getGraphEdgeConstructionCosts();
             HashMap<Edge, Double> edgeRightOfWayCosts = data.getGraphEdgeRightOfWayCosts();
-            int edgeTrend = edgeTrends.get(edg);
-            double fixed = (linearComponents[edgeTrend].getConIntercept() * edgeConstructionCosts.get(edg) + linearComponents[edgeTrend].getRowIntercept() * edgeRightOfWayCosts.get(edg)) * crf;
-            double variable = (linearComponents[edgeTrend].getConSlope() * edgeConstructionCosts.get(edg) + linearComponents[edgeTrend].getRowSlope() * edgeRightOfWayCosts.get(edg)) * crf / 1.0;
+
+            double transportAmount = edgeTransportAmounts.get(edg);
+            LinearComponent comp = null;
+            boolean found = false;
+            for (LinearComponent c : linearComponents) {
+                if (!found && transportAmount <= c.getMaxCapacity()) {
+                    found = true;
+                    comp = c;
+                }
+            }
+
+            double fixed = (comp.getConIntercept() * edgeConstructionCosts.get(edg) + comp.getRowIntercept() * edgeRightOfWayCosts.get(edg)) * crf;
+            double variable = (comp.getConSlope() * edgeConstructionCosts.get(edg) + comp.getRowSlope() * edgeRightOfWayCosts.get(edg)) * crf / 1.0;
             double cost = fixed + variable * edgeTransportAmounts.get(edg);
             edgeCosts.put(edg, cost);
+            
+            if (edg.v1 == 16446255 && edg.v2 == 17112348) {
+                System.out.println(comp.getMaxCapacity() + ", " + cost + ", " + edgeTransportAmounts.get(edg));
+            }
         }
     }
 

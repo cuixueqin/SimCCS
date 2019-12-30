@@ -604,7 +604,8 @@ public class ControlActions {
                 Solution soln = DataInOut.loadGreedyHeuristicSolution(solutionPath);
                 displaySolution(file, soln, solutionValues);
             } else if (file.contains("flow")) {
-                Solution soln = DataInOut.loadSolution(solutionPath, -1);
+                Solution soln = DataInOut.loadFlowHeuristicSolution(solutionPath);
+                //Solution soln = DataInOut.loadSolution(solutionPath, -1);
                 displaySolution(file, soln, solutionValues);
             } else if (file.contains("cap")) {
                 Solution soln = DataInOut.loadSolution(solutionPath, -1);

@@ -801,7 +801,7 @@ public class DataInOut {
                             soln.addSinkStorageAmount(sinks[Integer.parseInt(components[1])], Double.parseDouble(variable[2]));
                         } else if (components[0].equals("p")) {
                             if (components.length == 4) {
-                                soln.addEdgeTransportAmount(new Edge(vertexIndexToCell.get(Integer.parseInt(components[1])), vertexIndexToCell.get(Integer.parseInt(components[2]))), Double.parseDouble(variable[2]));  
+                                soln.addEdgeTransportAmount(new Edge(vertexIndexToCell.get(Integer.parseInt(components[1])), vertexIndexToCell.get(Integer.parseInt(components[2]))), Double.parseDouble(variable[2]));
                                 soln.setEdgeTrend(new Edge(vertexIndexToCell.get(Integer.parseInt(components[1])), vertexIndexToCell.get(Integer.parseInt(components[2]))), Integer.parseInt(components[3]));
                             } else {
                                 UnidirEdge unidirEdge = edgeIndexToEdge.get(Integer.parseInt(components[1]));
@@ -924,6 +924,107 @@ public class DataInOut {
         } else {
             soln.setSolutionCosts(data);
         }
+
+        return soln;
+    }
+
+    public static Solution loadFlowHeuristicSolution(String solutionPath) {
+        double threshold = .000001;
+        Solution soln = new Solution();
+
+        // Make file paths.
+        File solFile = null;
+        File mpsFile = null;
+        for (File f : new File(solutionPath).listFiles()) {
+            if (f.getName().endsWith(".sol")) {
+                solFile = f;
+            } else if (f.getName().endsWith(".mps")) {
+                mpsFile = f;
+            }
+        }
+
+        // Collect data.
+        Source[] sources = data.getSources();
+        Sink[] sinks = data.getSinks();
+        int[] graphVertices = data.getGraphVertices();
+        HashMap<Edge, Double> edgeConstructionCosts = data.getGraphEdgeConstructionCosts();
+
+        // Make cell/index maps.
+        HashMap<Source, Integer> sourceCellToIndex = new HashMap<>();
+        HashMap<Integer, Source> sourceIndexToCell = new HashMap<>();
+        HashMap<Sink, Integer> sinkCellToIndex = new HashMap<>();
+        HashMap<Integer, Sink> sinkIndexToCell = new HashMap<>();
+        HashMap<Integer, Integer> vertexCellToIndex = new HashMap<>();
+        HashMap<Integer, Integer> vertexIndexToCell = new HashMap<>();
+        HashMap<UnidirEdge, Integer> edgeToIndex = new HashMap<>();
+        HashMap<Integer, UnidirEdge> edgeIndexToEdge = new HashMap<>();
+
+        // Initialize cell/index maps.
+        for (int i = 0; i < sources.length; i++) {
+            sourceCellToIndex.put(sources[i], i);
+            sourceIndexToCell.put(i, sources[i]);
+        }
+        for (int i = 0; i < sinks.length; i++) {
+            sinkCellToIndex.put(sinks[i], i);
+            sinkIndexToCell.put(i, sinks[i]);
+        }
+        for (int i = 0; i < graphVertices.length; i++) {
+            vertexCellToIndex.put(graphVertices[i], i);
+            vertexIndexToCell.put(i, graphVertices[i]);
+        }
+        int index = 0;
+        for (Edge e : edgeConstructionCosts.keySet()) {
+            UnidirEdge e1 = new UnidirEdge(e.v1, e.v2);
+            edgeToIndex.put(e1, index);
+            edgeIndexToEdge.put(index, e1);
+            index++;
+
+            UnidirEdge e2 = new UnidirEdge(e.v2, e.v1);
+            edgeToIndex.put(e2, index);
+            edgeIndexToEdge.put(index, e2);
+            index++;
+        }
+
+        HashMap<String, Double> variableValues = new HashMap<>();
+        HashMap<Integer, Integer> timeslotLengths = new HashMap<>();
+
+        try (BufferedReader br = new BufferedReader(new FileReader(solFile))) {
+            String line = br.readLine();
+            while (!line.equals(" <variables>")) {
+                line = br.readLine();
+            }
+            line = br.readLine();
+
+            while (!line.equals(" </variables>")) {
+                String[] partition = line.split("\"");
+                String[] variable = new String[]{partition[1], partition[3], partition[7]};
+
+                if (Double.parseDouble(variable[2]) > threshold) {
+                    variableValues.put(variable[0], Double.parseDouble(variable[2]));
+                    String[] components = variable[0].split("\\]\\[|\\[|\\]");
+                    if (components[0].equals("a")) {
+                        soln.addSourceCaptureAmount(sources[Integer.parseInt(components[1])], Double.parseDouble(variable[2]));
+                    } else if (components[0].equals("b")) {
+                        soln.addSinkStorageAmount(sinks[Integer.parseInt(components[1])], Double.parseDouble(variable[2]));
+                    } else if (components[0].equals("p")) {
+                        UnidirEdge unidirEdge = edgeIndexToEdge.get(Integer.parseInt(components[1]));
+                        soln.addEdgeTransportAmount(new Edge(unidirEdge.v1, unidirEdge.v2), Double.parseDouble(variable[2]));
+                    }
+
+                    if (variable[0].equals("crf")) {
+                        soln.setCRF(Double.parseDouble(variable[2]));
+                    } else if (variable[0].equals("projectLength")) {
+                        soln.setProjectLength(Integer.parseInt(variable[2]));
+                    }
+                }
+                line = br.readLine();
+            }
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+        }
+
+        // load costs into solution.
+        soln.setSolutionCosts(data);
 
         return soln;
     }
