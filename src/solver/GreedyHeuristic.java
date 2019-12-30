@@ -19,6 +19,7 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import static utilities.Utilities.convertIntegerArray;
 
+
 /**
  *
  * @author yaw
@@ -36,8 +37,15 @@ public class GreedyHeuristic {
     private double[][] adjacencyCosts;
     private HashMap<Integer, Integer> cellNumToVertexNum;
     private HashMap<Integer, HashSet<Integer>> neighbors;
+    
+    private HashSet<Source> solutionSources;
+    private HashSet<Sink> solutionSinks;
 
     public GreedyHeuristic(DataStorer data) {
+        
+        solutionSources = new HashSet<Source>();
+        solutionSinks = new HashSet<Sink>();
+        
         this.data = data;
 
         sources = data.getSources();
@@ -195,7 +203,7 @@ public class GreedyHeuristic {
 
         src.setRemainingCapacity(src.getRemainingCapacity() - transferAmount);
         snk.setRemainingCapacity(snk.getRemainingCapacity() - transferAmount);
-
+        
         double totalTransferAmount = snk.getCapacity() / data.getProjectLength() - snk.getRemainingCapacity();
         snk.setNumWells(getNewNumWells(snk, totalTransferAmount));
 
@@ -215,12 +223,12 @@ public class GreedyHeuristic {
                     // Update hosting amount
                     backEdge.currentHostingAmount -= transferAmount;
                 } else if (transferAmount > backEdge.currentHostingAmount) {    //If front edge is now needed
-                    backEdge.currentSize = 0;
-                    backEdge.currentHostingAmount = 0;
-
                     int newSize = getNewPipelineSize(frontEdge, transferAmount - backEdge.currentHostingAmount);
                     frontEdge.currentSize = newSize;
                     frontEdge.currentHostingAmount = transferAmount - backEdge.currentHostingAmount;
+                    
+                    backEdge.currentSize = 0;
+                    backEdge.currentHostingAmount = 0;
                 } else {
                     backEdge.currentSize = 0;
                     backEdge.currentHostingAmount = 0;
@@ -394,6 +402,10 @@ public class GreedyHeuristic {
         return sinks;
     }
 
+    public HashMap<Integer, HashSet<Integer>> getNeighbors() {
+        return(neighbors);
+    }
+    
     public int[] getGraphVertices() {
         return graphVertices;
     }
@@ -405,7 +417,8 @@ public class GreedyHeuristic {
     public HashMap<Integer, Integer> getCellVertexMap() {
         return cellNumToVertexNum;
     }
-
+    
+    
     private class Data implements Comparable<Data> {
 
         public int vertexNum;
