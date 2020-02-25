@@ -1,4 +1,4 @@
-/*
+ /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
@@ -40,6 +40,7 @@ public class GreedyHeuristic {
     
     private HashSet<Source> solutionSources;
     private HashSet<Sink> solutionSinks;
+    
 
     public GreedyHeuristic(DataStorer data) {
         
@@ -55,7 +56,8 @@ public class GreedyHeuristic {
         cellNumToVertexNum = new HashMap<>();
         neighbors = new HashMap<>();
     }
-
+    
+    
     // Every iteration, the algorithm will choose numPairs pairs with the lowest cost to add to the network.
     // Should be between 1 and the number of pairs (#srcs*#snks).
     public void solve(int numPairs, int modelVersion) {
@@ -95,6 +97,7 @@ public class GreedyHeuristic {
                 }
             }
         }
+        
 
         if (modelVersion == 1) {
             capacityModel(numPairs);
@@ -139,9 +142,11 @@ public class GreedyHeuristic {
 
             Pair cheapest[] = new Pair[numPairs];
             cheapest = pairCostsList.subList(0, numPairs).toArray(cheapest);
-
+            
             double transferAmount = 0;
             for (int i = 0; i < cheapest.length; i++) {
+                
+                
                 transferAmount = Math.min(Math.min(Math.min(
                 		cheapest[i].src.getRemainingCapacity(), 
                 		cheapest[i].snk.getRemainingCapacity()),
@@ -149,6 +154,7 @@ public class GreedyHeuristic {
                 		amountPossible - amountCaptured);
                 
                 amountCaptured += transferAmount;
+                
                 
                 schedulePair(cheapest[i].src, cheapest[i].snk, cheapest[i].path, transferAmount);
 
@@ -187,9 +193,12 @@ public class GreedyHeuristic {
             if (cheapest[0].cost >= 0) {
                 negativePair = false;
             }
+            
 
             double transferAmount = 0;
             for (int i = 0; i < cheapest.length; i++) {
+                
+                
                 if (cheapest[i].cost < 0) {
                     transferAmount = Math.min(cheapest[i].src.getRemainingCapacity(), cheapest[i].snk.getRemainingCapacity());
                     schedulePair(cheapest[i].src, cheapest[i].snk, cheapest[i].path, transferAmount);
@@ -270,10 +279,10 @@ public class GreedyHeuristic {
                     cost += transferAmount * snk.getInjectionCost();
 
                     // Assign costs to graph
-                    setGraphCosts(src, snk, transferAmount);
+                    //setGraphCosts(src, snk, transferAmount);
 
                     // Find shortest path between src and snk
-                    Object[] data = dijkstra(src, snk);
+                    Object[] data = dijkstra(src, snk,transferAmount);
                     path = (HashSet<HeuristicEdge>) data[0];
                     double pathCost = (double) data[1];
 
@@ -287,49 +296,6 @@ public class GreedyHeuristic {
             }
         }
         return pairCosts;
-    }
-
-    // For a given src/snk pair, set the cost of the edgs to carry transferAmount of CO2
-    public void setGraphCosts(Source src, Sink snk, double transferAmount) {
-        for (int u = 0; u < graphVertices.length; u++) {
-            for (int v = 0; v < graphVertices.length; v++) {
-                HeuristicEdge frontEdge = adjacencyMatrix[u][v];
-                HeuristicEdge backEdge = adjacencyMatrix[v][u];
-                double edgeCost = 0;
-
-                if (frontEdge != null) {
-                    // If edge in opposite direction is hosting flow
-                    if (backEdge.currentHostingAmount > 0) {
-                        // Remove back edge (because it will need to change)
-                        edgeCost -= backEdge.buildCost[backEdge.currentSize];
-                        edgeCost -= backEdge.currentHostingAmount * backEdge.transportCost[backEdge.currentSize];
-
-                        // If the back edge is still needed
-                        if (transferAmount < backEdge.currentHostingAmount) {
-                            // Calculate the new pipeline size
-                            int newSize = getNewPipelineSize(backEdge, backEdge.currentHostingAmount - transferAmount);
-
-                            // Factor in build costs
-                            edgeCost += backEdge.buildCost[newSize];
-
-                            // Factor in utilization costs
-                            edgeCost += backEdge.transportCost[newSize] * (backEdge.currentHostingAmount - transferAmount);
-                        } else if (transferAmount > backEdge.currentHostingAmount) {    //If front edge is now needed
-                            int newSize = getNewPipelineSize(frontEdge, transferAmount - backEdge.currentHostingAmount);
-                            edgeCost += frontEdge.buildCost[newSize];
-                            edgeCost += frontEdge.transportCost[newSize] * (transferAmount - backEdge.currentHostingAmount);
-                        }
-                    } else {
-                        int newSize = getNewPipelineSize(frontEdge, transferAmount + frontEdge.currentHostingAmount);
-                        edgeCost += frontEdge.buildCost[newSize] - frontEdge.buildCost[frontEdge.currentSize];
-                        edgeCost += frontEdge.transportCost[newSize] * (transferAmount + frontEdge.currentHostingAmount) - frontEdge.transportCost[frontEdge.currentSize] * (frontEdge.currentHostingAmount);
-                    }
-                    //frontEdge.cost = edgeCost;
-                    frontEdge.cost = Math.max(edgeCost, 0); //NEED TO THINK ABOUT THIS!
-                    adjacencyCosts[u][v] = Math.max(edgeCost, 0);
-                }
-            }
-        }
     }
 
     public int getNewPipelineSize(HeuristicEdge edge, double volume) {
@@ -346,7 +312,9 @@ public class GreedyHeuristic {
     }
 
     // Dijkstra to run on graph edges
-    public Object[] dijkstra(Source src, Sink snk) {
+    public Object[] dijkstra(Source src, Sink snk,double transferAmount) {
+        
+        
         int srcVertexNum = cellNumToVertexNum.get(src.getCellNum());
         int snkVertexNum = cellNumToVertexNum.get(snk.getCellNum());
 
@@ -370,8 +338,42 @@ public class GreedyHeuristic {
             GreedyHeuristic.Data u = pQueue.poll();
             for (int neighbor : neighbors.get(u.vertexNum)) {
                 if (adjacencyMatrix[u.vertexNum][neighbor] != null) {
-                    //double altDistance = costs[u.vertexNum] + adjacencyMatrix[u.vertexNum][neighbor].cost;
-                    double altDistance = costs[u.vertexNum] + adjacencyCosts[u.vertexNum][neighbor];
+                    
+                    
+                    HeuristicEdge frontEdge = adjacencyMatrix[u.vertexNum][neighbor];
+                    HeuristicEdge backEdge = adjacencyMatrix[neighbor][u.vertexNum];
+                    double edgeCost = 0;
+
+                    if (frontEdge != null) {
+                        // If edge in opposite direction is hosting flow
+                        if (backEdge.currentHostingAmount > 0) {
+                            // Remove back edge (because it will need to change)
+                            edgeCost -= backEdge.buildCost[backEdge.currentSize];
+                            edgeCost -= backEdge.currentHostingAmount * backEdge.transportCost[backEdge.currentSize];
+
+                            // If the back edge is still needed
+                            if (transferAmount < backEdge.currentHostingAmount) {
+                                // Calculate the new pipeline size
+                                int newSize = getNewPipelineSize(backEdge, backEdge.currentHostingAmount - transferAmount);
+
+                                // Factor in build costs
+                                edgeCost += backEdge.buildCost[newSize];
+
+                                // Factor in utilization costs
+                                edgeCost += backEdge.transportCost[newSize] * (backEdge.currentHostingAmount - transferAmount);
+                            } else if (transferAmount > backEdge.currentHostingAmount) {    //If front edge is now needed
+                                int newSize = getNewPipelineSize(frontEdge, transferAmount - backEdge.currentHostingAmount);
+                                edgeCost += frontEdge.buildCost[newSize];
+                                edgeCost += frontEdge.transportCost[newSize] * (transferAmount - backEdge.currentHostingAmount);
+                            }
+                        } else {
+                            int newSize = getNewPipelineSize(frontEdge, transferAmount + frontEdge.currentHostingAmount);
+                            edgeCost += frontEdge.buildCost[newSize] - frontEdge.buildCost[frontEdge.currentSize];
+                            edgeCost += frontEdge.transportCost[newSize] * (transferAmount + frontEdge.currentHostingAmount) - frontEdge.transportCost[frontEdge.currentSize] * (frontEdge.currentHostingAmount);
+                        }
+                    }
+                    
+                    double altDistance = costs[u.vertexNum] + Math.max(edgeCost, 0);
                     if (altDistance < costs[neighbor]) {
                         costs[neighbor] = altDistance;
                         previous[neighbor] = u.vertexNum;
